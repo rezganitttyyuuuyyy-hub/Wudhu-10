@@ -1,0 +1,205 @@
+diff --git a/node_modules/react-native-google-mobile-ads/android/build.gradle b/node_modules/react-native-google-mobile-ads/android/build.gradle
+index 8a31e69..3223151 100644
+--- a/node_modules/react-native-google-mobile-ads/android/build.gradle
++++ b/node_modules/react-native-google-mobile-ads/android/build.gradle
+@@ -1,113 +1,37 @@
+-import io.invertase.gradle.common.PackageJson
+-
+-buildscript {
+-  ext.getExtOrDefault = {name, version ->
+-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : version
+-  }
+-
+-  // The Android Gradle plugin is only required when opening the android folder stand-alone.
+-  // This avoids unnecessary downloads and potential conflicts when the library is included as a
+-  // module dependency in an application project.
+-  if (project == rootProject) {
+-    repositories {
+-      google()
+-      mavenCentral()
+-    }
+-
+-    dependencies {
+-      classpath("com.android.tools.build:gradle:7.0.4")
+-      classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion', '1.8.22')}"
+-    }
+-  } else {
+-    repositories {
+-      mavenCentral()
+-    }
++apply plugin: 'com.android.library'
++apply plugin: 'kotlin-android'
+ 
+-    dependencies {
+-      classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion', '1.8.22')}"
+-    }
+-  }
++def safeExtGet(prop, fallback) {
++  return rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+ }
+ 
+-plugins {
+-  id "io.invertase.gradle.build" version "1.5"
+-}
+-apply plugin: 'kotlin-android'
++def googleMobileAdsVersion = "25.4.0"
++def googleUmpVersion = "4.0.0"
+ 
+-def packageJson = PackageJson.getForProject(project)
+-def googleMobileAdsVersion = packageJson['sdkVersions']['android']['googleMobileAds']
+-def googleUmpVersion = packageJson['sdkVersions']['android']['googleUmp']
+-def jsonMinSdk = packageJson['sdkVersions']['android']['minSdk']
+-def jsonTargetSdk = packageJson['sdkVersions']['android']['targetSdk']
+-def jsonCompileSdk = packageJson['sdkVersions']['android']['compileSdk']
+-def jsonBuildTools = packageJson['sdkVersions']['android']['buildTools']
+ def isNewArchitectureEnabled() {
+-    return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
++  return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+ }
+ 
+ if (isNewArchitectureEnabled()) {
+-    apply plugin: "com.facebook.react"
+-}
+-
+-project.ext {
+-  set('react-native', [
+-    versions: [
+-      android : [
+-        minSdk    : jsonMinSdk,
+-        targetSdk : jsonTargetSdk,
+-        compileSdk: jsonCompileSdk,
+-        // optional as gradle.buildTools comes with one by default
+-        // overriding here though to match the version RN uses
+-        buildTools: jsonBuildTools
+-      ],
+-
+-      googleMobileAds: [
+-        sdk: googleMobileAdsVersion,
+-      ],
+-
+-      ads     : [
+-        consent: googleUmpVersion,
+-      ],
+-    ],
+-  ])
+-}
+-
+-apply from: file("./app-json.gradle")
+-
+-def appJSONGoogleMobileAdsAppIDString = ""
+-def appJSONGoogleMobileAdsDelayAppMeasurementInitBool = false
+-def appJSONGoogleMobileAdsOptimizeInitializationBool = true
+-def appJSONGoogleMobileAdsOptimizeAdLoadingBool = true
+-
+-if (rootProject.ext.has("googleMobileAdsJson") && rootProject.ext.googleMobileAdsJson) {
+-  appJSONGoogleMobileAdsAppIDString = rootProject.ext.googleMobileAdsJson.getStringValue("android_app_id", "")
+-  appJSONGoogleMobileAdsDelayAppMeasurementInitBool = rootProject.ext.googleMobileAdsJson.isFlagEnabled("delay_app_measurement_init", false)
+-  appJSONGoogleMobileAdsOptimizeInitializationBool = rootProject.ext.googleMobileAdsJson.isFlagEnabled("optimize_initialization", true)
+-  appJSONGoogleMobileAdsOptimizeAdLoadingBool = rootProject.ext.googleMobileAdsJson.isFlagEnabled("optimize_ad_loading", true)
+-}
+-
+-if (!appJSONGoogleMobileAdsAppIDString) {
+-  println "\n\n\n"
+-  println "**************************************************************************************************************"
+-  println "\n\n\n"
+-  println "WARNING: react-native-google-mobile-ads requires an 'android_app_id' property inside a 'react-native-google-mobile-ads' key in your app.json."
+-  println "         No android_app_id property was found in this location. The native Google Mobile Ads SDK will crash on startup without it."
+-  println "         You can safely ignore this warning if you are using our Expo config plugin."
+-  println "\n\n\n"
+-  println "**************************************************************************************************************"
+-  println "\n\n\n"
++  apply plugin: "com.facebook.react"
+ }
+ 
+ android {
++  namespace "io.invertase.googlemobileads"
++  compileSdkVersion safeExtGet("compileSdkVersion", 36)
++
+   defaultConfig {
++    minSdkVersion safeExtGet("minSdkVersion", 24)
++    targetSdkVersion safeExtGet("targetSdkVersion", 36)
+     multiDexEnabled true
+     manifestPlaceholders = [
+-      appJSONGoogleMobileAdsAppID                  : appJSONGoogleMobileAdsAppIDString,
+-      appJSONGoogleMobileAdsDelayAppMeasurementInit: appJSONGoogleMobileAdsDelayAppMeasurementInitBool,
+-      appJSONGoogleMobileAdsOptimizeInitialization : appJSONGoogleMobileAdsOptimizeInitializationBool,
+-      appJSONGoogleMobileAdsOptimizeAdLoading      : appJSONGoogleMobileAdsOptimizeAdLoadingBool
++      appJSONGoogleMobileAdsAppID                  : "",
++      appJSONGoogleMobileAdsDelayAppMeasurementInit: false,
++      appJSONGoogleMobileAdsOptimizeInitialization : true,
++      appJSONGoogleMobileAdsOptimizeAdLoading      : true
+     ]
+     buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
++    buildConfigField "String", "GOOGLE_MOBILE_ADS_JSON_RAW", '"{}"'
+ 
+     sourceSets {
+       main {
+@@ -119,13 +43,23 @@ android {
+       }
+     }
+   }
+-  lintOptions {
++
++  buildFeatures {
++    buildConfig true
++  }
++
++  lint {
+     disable 'GradleCompatible'
+     abortOnError false
+   }
++
+   compileOptions {
+-    sourceCompatibility JavaVersion.VERSION_1_8
+-    targetCompatibility JavaVersion.VERSION_1_8
++    sourceCompatibility JavaVersion.VERSION_17
++    targetCompatibility JavaVersion.VERSION_17
++  }
++
++  kotlinOptions {
++    jvmTarget = "17"
+   }
+ }
+ 
+@@ -137,10 +71,6 @@ repositories {
+ dependencies {
+   implementation("com.google.android.gms:play-services-ads:${googleMobileAdsVersion}")
+   api "com.google.android.ump:user-messaging-platform:${googleUmpVersion}"
++  //noinspection GradleDynamicVersion
++  implementation 'com.facebook.react:react-native:+'
+ }
+-
+-ReactNative.shared.applyPackageVersion()
+-ReactNative.shared.applyDefaultExcludes()
+-ReactNative.module.applyAndroidVersions()
+-ReactNative.module.applyReactNativeDependency("api")
+-
+diff --git a/node_modules/react-native-google-mobile-ads/android/src/main/AndroidManifest.xml b/node_modules/react-native-google-mobile-ads/android/src/main/AndroidManifest.xml
+index 065ccb8..d1c59b1 100644
+--- a/node_modules/react-native-google-mobile-ads/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-google-mobile-ads/android/src/main/AndroidManifest.xml
+@@ -1,23 +1,8 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="io.invertase.googlemobileads">
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ 
+     <uses-permission android:name="android.permission.INTERNET" />
+     <uses-permission android:name="android.permission.WAKE_LOCK" />
+     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+ 
+-    <application>
+-      <meta-data
+-        android:name="com.google.android.gms.ads.APPLICATION_ID"
+-        android:value="${appJSONGoogleMobileAdsAppID}"/>
+-      <meta-data
+-        android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+-        android:value="${appJSONGoogleMobileAdsDelayAppMeasurementInit}"/>
+-      <meta-data
+-        android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
+-        android:value="${appJSONGoogleMobileAdsOptimizeInitialization}"/>
+-      <meta-data
+-        android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING"
+-        android:value="${appJSONGoogleMobileAdsOptimizeAdLoading}"/>
+-    </application>
+ </manifest>
